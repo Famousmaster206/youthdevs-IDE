@@ -2580,6 +2580,15 @@ export default function App() {
             )}
           </main>
         )}
+        <SkipCourseSubmitModal
+          open={skipCourseSubmitOpen}
+          theme={theme}
+          project={skipCourseSubmitProject}
+          onClose={() => {
+            setSkipCourseSubmitOpen(false);
+            setSkipCourseSubmitProject(null);
+          }}
+        />
       </div>
     );
   }
