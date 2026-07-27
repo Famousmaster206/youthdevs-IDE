@@ -9,7 +9,7 @@ const ALLOWED_BRIDGE_ORIGINS = new Set([
 ]);
 
 const DEFAULT_BRIDGE_BASE =
-  process.env.NEXT_PUBLIC_SKIPCOURSE_AUTH_BRIDGE_URL || 'https://skipcourse.com/auth/ide-bridge';
+  process.env.NEXT_PUBLIC_SKIPCOURSE_AUTH_BRIDGE_URL || 'https://deepvalidation.skipcourse.com/auth/ide-bridge';
 
 function readStoredSession() {
   if (typeof window === 'undefined') return null;
@@ -74,11 +74,13 @@ export function listenForSkipCourseAuth(timeoutMs = 120000) {
   return new Promise((resolve, reject) => {
     let settled = false;
     let popupRef = null;
+    let popupPoll = null;
+    let timeoutId = null;
 
     const cleanup = () => {
       window.removeEventListener('message', onMessage);
-      window.clearInterval(popupPoll);
-      window.clearTimeout(timeoutId);
+      if (popupPoll !== null) window.clearInterval(popupPoll);
+      if (timeoutId !== null) window.clearTimeout(timeoutId);
     };
 
     const finish = (handler) => {
@@ -89,7 +91,18 @@ export function listenForSkipCourseAuth(timeoutMs = 120000) {
     };
 
     const onMessage = (event) => {
-      if (!ALLOWED_BRIDGE_ORIGINS.has(event.origin)) return;
+      if (!ALLOWED_BRIDGE_ORIGINS.has(event.origin)) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn(
+            '[SkipCourse] Ignored postMessage from unexpected origin:',
+            event.origin,
+            '(expected one of',
+            [...ALLOWED_BRIDGE_ORIGINS].join(', '),
+            ')',
+          );
+        }
+        return;
+      }
       const data = event.data;
       if (!data || data.type !== 'SKIPCOURSE_AUTH_SUCCESS') return;
       if (!data.uid || !data.idToken) return;
@@ -103,27 +116,28 @@ export function listenForSkipCourseAuth(timeoutMs = 120000) {
       });
     };
 
-    const popupPoll = window.setInterval(() => {
-      if (!popupRef || popupRef.closed) {
-        finish(() => {
-          reject(new Error('Sign-in window closed before authentication completed.'));
-        });
-      }
-    }, 500);
-
-    const timeoutId = window.setTimeout(() => {
-      finish(() => {
-        reject(new Error('Sign-in timed out. Please try again.'));
-      });
-    }, timeoutMs);
-
     window.addEventListener('message', onMessage);
 
     try {
       popupRef = openSkipCourseLoginPopup();
     } catch (error) {
       finish(() => reject(error instanceof Error ? error : new Error(String(error))));
+      return;
     }
+
+    popupPoll = window.setInterval(() => {
+      if (popupRef?.closed) {
+        finish(() => {
+          reject(new Error('Sign-in window closed before authentication completed.'));
+        });
+      }
+    }, 500);
+
+    timeoutId = window.setTimeout(() => {
+      finish(() => {
+        reject(new Error('Sign-in timed out. Please try again.'));
+      });
+    }, timeoutMs);
   });
 }
 
