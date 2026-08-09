@@ -81,6 +81,7 @@ export default function LandingPage() {
           <a href="#features" className="transition-colors hover:text-emerald-300">Features</a>
           <a href="#workflow" className="transition-colors hover:text-emerald-300">Workflow</a>
           <a href="#ship" className="transition-colors hover:text-emerald-300">Ship faster</a>
+          <Link href="/help" className="transition-colors hover:text-emerald-300">Guide</Link>
         </div>
         <Link href="/login" className="rounded-lg border border-white/15 px-4 py-2 text-sm font-semibold text-white transition hover:border-emerald-300/50 hover:bg-white/5">
           Sign in

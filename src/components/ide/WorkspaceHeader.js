@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, Github, Moon, Sun, UserPlus, Users, Zap } from 'lucide-react';
+import { ArrowLeft, Github, HelpCircle, Moon, Sun, UserPlus, Users, Zap } from 'lucide-react';
 import { formatTime } from '../../lib/ide-utils';
 
 export default function WorkspaceHeader({
@@ -93,6 +93,16 @@ export default function WorkspaceHeader({
             <span>IDE Users: <b className="font-mono">{totalUsers !== undefined && totalUsers !== null ? totalUsers : '...'}</b></span>
           </div>
         )}
+
+        <a
+          href="/help"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`p-2 rounded-lg border transition-all shrink-0 ${theme === 'dark' ? 'border-emerald-900/30 text-emerald-300 hover:bg-[#0b1810]' : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'}`}
+          title="Open the user guide"
+        >
+          <HelpCircle size={14} />
+        </a>
 
         <button
           onClick={onToggleTheme}
