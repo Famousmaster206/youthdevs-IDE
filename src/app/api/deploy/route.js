@@ -229,19 +229,24 @@ export async function POST(request) {
 
     const deploymentId = deployment?.id || deployment?.uid || deployment?.deployment?.id || deployment?.deployment?.uid || null;
     const deploymentUrl = deployment?.url ? `https://${deployment.url}` : '';
-    const resolvedUrl = deploymentUrl || `https://${aliasDomain}`;
 
+    let aliasAssigned = !useCustomDomain;
     if (useCustomDomain && deploymentId && aliasDomain) {
       try {
         await ensureProjectAlias(token, deploymentId, aliasDomain);
+        aliasAssigned = true;
       } catch (aliasError) {
         console.warn('Vercel alias assignment failed:', aliasError?.message || aliasError);
       }
     }
 
+    // Prefer the stable hosting domain (project alias) over the per-deployment
+    // hash URL, so users are shown the address their site actually lives at.
+    const hostingUrl = aliasAssigned ? `https://${aliasDomain}` : (deploymentUrl || `https://${aliasDomain}`);
+
     return NextResponse.json({
-      url: resolvedUrl,
-      deploymentUrl: deploymentUrl || resolvedUrl,
+      url: hostingUrl,
+      deploymentUrl: deploymentUrl || hostingUrl,
       projectId,
       projectName,
       domainMode: useCustomDomain ? 'custom' : 'vercel',
