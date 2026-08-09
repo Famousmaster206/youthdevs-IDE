@@ -9,6 +9,7 @@ import Terminal from './Terminal';
 import AdminSubmissionWorkspace from './admin/AdminSubmissionWorkspace';
 import ChangeCommitModal from './modals/ChangeCommitModal';
 import AdminSubmissionInspectorModal from './modals/AdminSubmissionInspectorModal';
+import SkipCourseSubmitModal from './modals/SkipCourseSubmitModal';
 import useRouteGuard from './hooks/useRouteGuard';
 import {
   buildVercelFilesPayload,
@@ -196,7 +197,8 @@ export default function App() {
   const [deployError, setDeployError] = useState('');
   const [deployUrl, setDeployUrl] = useState('');
   const [deployDomainMode, setDeployDomainMode] = useState('');
-  const [skipCourseSubmittingProjectId, setSkipCourseSubmittingProjectId] = useState('');
+  const [skipCourseSubmitOpen, setSkipCourseSubmitOpen] = useState(false);
+  const [skipCourseSubmitProject, setSkipCourseSubmitProject] = useState(null);
 
   // Teammate Invitation Input State
   const [teammateEmailInput, setTeammateEmailInput] = useState('');
@@ -562,43 +564,14 @@ export default function App() {
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
-  const submitProjectToSkipCourse = async (projectToSubmit, toastMessage = 'Submitting to SkipCourse...') => {
-    if (!user) throw new Error('You must be signed in to submit to SkipCourse.');
-
-    const submittedFiles = Array.isArray(projectToSubmit?.files)
-      ? projectToSubmit.files.map((file) => ({ ...file }))
-      : [];
-    const submissionProjectId = projectToSubmit?.id || projectToSubmit?.slug || projectToSubmit?.name || '';
-
+  const openSkipCourseSubmitModal = (projectToSubmit) => {
+    const submittedFiles = Array.isArray(projectToSubmit?.files) ? projectToSubmit.files : [];
     if (!submittedFiles.length) {
-      throw new Error('No project files were available to submit.');
+      toast.error('No project files were available to submit.');
+      return;
     }
-
-    setSkipCourseSubmittingProjectId(submissionProjectId);
-    const toastId = toast.loading(toastMessage);
-    try {
-      const payload = {
-        userId: user.uid || user.email,
-        codeContent: buildVercelFilesPayload(submittedFiles),
-      };
-
-      const response = await fetch('/api/skipcourse-submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const result = await response.json();
-
-      if (!response.ok) throw new Error(result?.error || 'SkipCourse rejected the submission.');
-
-      toast.success('Submission successful', { id: toastId });
-    } catch (error) {
-      console.error(error);
-      toast.error('Failed to submit to SkipCourse', { id: toastId });
-      throw error;
-    } finally {
-      setSkipCourseSubmittingProjectId('');
-    }
+    setSkipCourseSubmitProject(projectToSubmit);
+    setSkipCourseSubmitOpen(true);
   };
 
   // Theme Initialization Layer
@@ -961,7 +934,7 @@ export default function App() {
       });
   }, [githubToken]);
 
-  // Sync Live Workspace Presence Matrix 
+  // Sync Live Workspace Presence Matrix
   useEffect(() => {
     if (!currentProjectId || !user || !activeFileId || !db) return;
 
@@ -2295,7 +2268,7 @@ export default function App() {
         {/* CONDITIONAL RENDER: HACKATHON ADMIN CONTROLLER PANEL VIEW */}
         {canAccessAdminPanel && isAdminRoute ? (
           <main className="flex-1 max-w-4xl w-full mx-auto p-6 md:p-10 overflow-y-auto">
-          <div className={`border p-6 rounded-2xl mb-8 ${theme === 'dark' ? 'bg-gradient-to-r from-emerald-950/35 via-slate-950 to-emerald-900/20 border-emerald-900/30' : 'bg-gradient-to-r from-emerald-50 via-white to-emerald-50 border-emerald-200'}`}>
+            <div className={`border p-6 rounded-2xl mb-8 ${theme === 'dark' ? 'bg-gradient-to-r from-emerald-950/35 via-slate-950 to-emerald-900/20 border-emerald-900/30' : 'bg-gradient-to-r from-emerald-50 via-white to-emerald-50 border-emerald-200'}`}>
               <div className="flex items-center gap-2 text-emerald-300 font-bold mb-2">
                 <ShieldAlert size={20} />
                 <h2 className="text-lg">Hackathon Control Center</h2>
@@ -2406,19 +2379,19 @@ export default function App() {
 
                     <div className="flex gap-2">
                       <button
-                      onClick={() => {
-                        const nextSlug = slugifyProjectName(proj.projectSlug || proj.slug || proj.projectName || proj.name || proj.id || '');
-                        if (!nextSlug) return;
-                        setSelectedAdminProjectFiles(null);
-                        setAdminActiveFileName('');
-                        setAdminActiveFileContent('');
-                        const nextPath = buildAdminProjectPath(nextSlug);
-                        if (pathname !== nextPath) {
-                          router.push(nextPath);
-                        }
-                      }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg transition-colors"
-                    >
+                        onClick={() => {
+                          const nextSlug = slugifyProjectName(proj.projectSlug || proj.slug || proj.projectName || proj.name || proj.id || '');
+                          if (!nextSlug) return;
+                          setSelectedAdminProjectFiles(null);
+                          setAdminActiveFileName('');
+                          setAdminActiveFileContent('');
+                          const nextPath = buildAdminProjectPath(nextSlug);
+                          if (pathname !== nextPath) {
+                            router.push(nextPath);
+                          }
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg transition-colors"
+                      >
                         <FileSearch size={13} />
                         View Files
                       </button>
@@ -2594,15 +2567,11 @@ export default function App() {
                     <div className="mt-3 flex justify-start" onClick={(e) => e.stopPropagation()}>
                       <button
                         type="button"
-                        onClick={() => submitProjectToSkipCourse(proj, 'Submitting project to SkipCourse...')}
-                        disabled={skipCourseSubmittingProjectId === (proj?.id || proj?.slug || proj?.name || '')}
-                        aria-busy={skipCourseSubmittingProjectId === (proj?.id || proj?.slug || proj?.name || '')}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-700 text-xs font-bold transition-colors hover:bg-emerald-500/20 hover:border-emerald-400/30 disabled:cursor-not-allowed disabled:opacity-70"
+                        onClick={() => openSkipCourseSubmitModal(proj)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-700 text-xs font-bold transition-colors hover:bg-emerald-500/20 hover:border-emerald-400/30"
                       >
                         <Save size={12} />
-                        {skipCourseSubmittingProjectId === (proj?.id || proj?.slug || proj?.name || '')
-                          ? 'Sending to SkipCourse...'
-                          : 'Send to SkipCourse'}
+                        Send to SkipCourse
                       </button>
                     </div>
                   </div>
@@ -2611,6 +2580,15 @@ export default function App() {
             )}
           </main>
         )}
+        <SkipCourseSubmitModal
+          open={skipCourseSubmitOpen}
+          theme={theme}
+          project={skipCourseSubmitProject}
+          onClose={() => {
+            setSkipCourseSubmitOpen(false);
+            setSkipCourseSubmitProject(null);
+          }}
+        />
       </div>
     );
   }
@@ -2933,6 +2911,15 @@ export default function App() {
 
       <ChangeCommitModal open={showChangeModal} theme={theme} project={activeProjectData} value={changeNameInput} onChange={setChangeNameInput} onCancel={() => { setShowChangeModal(false); setPendingFilesToSync(null); }} onConfirm={handleConfirmChangeCommit} />
       <AdminSubmissionInspectorModal files={selectedAdminProjectFiles} theme={theme} activeFileName={adminActiveFileName} activeFileContent={adminActiveFileContent} onSelectFile={(file) => { setAdminActiveFileName(file.name || ''); setAdminActiveFileContent(file.content || ''); }} onClose={() => setSelectedAdminProjectFiles(null)} />
+      <SkipCourseSubmitModal
+        open={skipCourseSubmitOpen}
+        theme={theme}
+        project={skipCourseSubmitProject}
+        onClose={() => {
+          setSkipCourseSubmitOpen(false);
+          setSkipCourseSubmitProject(null);
+        }}
+      />
 
     </div>
   );
